@@ -24,8 +24,8 @@ const mockResult: GearAnalysisResult = {
 export async function analyzeGear(imageData: string): Promise<AnalyzeGearResult> {
   const apiKey = process.env.GEMINI_API_KEY
 
-  // If no API key, use mock response (for development/testing)
-  if (!apiKey) {
+  // If no API key or using placeholder, use mock response (for development/testing)
+  if (!apiKey || apiKey.length < 20) {
     // Simulate AI processing delay
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
@@ -50,9 +50,9 @@ export async function analyzeGear(imageData: string): Promise<AnalyzeGearResult>
     const mimeType = `image/${base64Match[1]}`
     const base64Data = base64Match[2]
 
-    // Add timeout wrapper to prevent hanging
+    // Add timeout wrapper to prevent hanging (10 seconds for better UX)
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('AI analysis timed out')), 30000)
+      setTimeout(() => reject(new Error('AI analysis timed out')), 10000)
     )
 
     const prompt = `Analyze this outdoor gear image. Return strictly valid JSON with these exact keys:
