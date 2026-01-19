@@ -107,10 +107,15 @@ export function ListingWizard() {
 
     setStep('analyzing')
 
-    // Convert file to base64 for the server action
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const base64 = reader.result as string
+    try {
+      // Convert file to base64 for the server action
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(uploadedFile)
+      })
+
       const result = await analyzeGear(base64)
 
       if (result.data) {
@@ -142,9 +147,19 @@ export function ListingWizard() {
         calculateSalePrice(result.data.retail_price, 0)
 
         setStep('review')
+      } else {
+        toast.error('Analysis Failed', {
+          description: 'Could not analyze the image. Please try again.',
+        })
+        setStep('upload')
       }
+    } catch (error) {
+      console.error('Analysis error:', error)
+      toast.error('Error', {
+        description: 'Something went wrong. Please try again.',
+      })
+      setStep('upload')
     }
-    reader.readAsDataURL(uploadedFile)
   }
 
   // Handle discount slider change

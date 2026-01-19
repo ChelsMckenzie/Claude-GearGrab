@@ -50,6 +50,11 @@ export async function analyzeGear(imageData: string): Promise<AnalyzeGearResult>
     const mimeType = `image/${base64Match[1]}`
     const base64Data = base64Match[2]
 
+    // Add timeout wrapper to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('AI analysis timed out')), 30000)
+    )
+
     const prompt = `Analyze this outdoor gear image. Return strictly valid JSON with these exact keys:
 {
   "brand": "string - the brand name",
@@ -64,7 +69,7 @@ export async function analyzeGear(imageData: string): Promise<AnalyzeGearResult>
 
 Only return the JSON object, no additional text or markdown formatting.`
 
-    const result = await model.generateContent([
+    const apiPromise = model.generateContent([
       {
         inlineData: {
           mimeType,
@@ -73,6 +78,9 @@ Only return the JSON object, no additional text or markdown formatting.`
       },
       prompt,
     ])
+
+    // Race between API call and timeout
+    const result = await Promise.race([apiPromise, timeoutPromise])
 
     const response = result.response
     const text = response.text()
