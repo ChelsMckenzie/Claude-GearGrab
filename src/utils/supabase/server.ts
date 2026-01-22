@@ -5,7 +5,8 @@ import { env } from '@/lib/env'
 export async function createClient() {
   const cookieStore = await cookies()
 
-  return createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return createServerClient<any>(env.supabaseUrl, env.supabaseAnonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll()

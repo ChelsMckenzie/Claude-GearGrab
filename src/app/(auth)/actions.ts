@@ -14,7 +14,7 @@ export async function login(formData: FormData) {
   // ✅ Validate input
   const result = loginSchema.safeParse(rawData)
   if (!result.success) {
-    return { error: result.error.errors[0].message }
+    return { error: result.error.issues[0].message }
   }
 
   const supabase = await createClient()
@@ -38,7 +38,7 @@ export async function signup(formData: FormData) {
   // ✅ Validate input
   const result = signupSchema.safeParse(rawData)
   if (!result.success) {
-    return { error: result.error.errors[0].message }
+    return { error: result.error.issues[0].message }
   }
 
   const supabase = await createClient()

@@ -1,7 +1,7 @@
 'use server'
 
 import type { ContactRequest, ContactRequestStatus } from '@/types/database'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, requireAuthWithId } from '@/lib/auth'
 import { createClient } from '@/utils/supabase/server'
 import { contactRequestSchema, updateContactStatusSchema } from '@/lib/validations'
 
@@ -25,7 +25,7 @@ export async function requestContact(
   })
 
   if (!validationResult.success) {
-    return { data: null, error: validationResult.error.errors[0].message }
+    return { data: null, error: validationResult.error.issues[0].message }
   }
 
   // ✅ Verify buyer is authenticated and matches buyerId
@@ -136,7 +136,7 @@ export async function updateContactStatus(
   })
 
   if (!validationResult.success) {
-    return { data: null, error: validationResult.error.errors[0].message }
+    return { data: null, error: validationResult.error.issues[0].message }
   }
 
   const { user } = await requireAuth()

@@ -164,8 +164,8 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
               isOwner={isOwner}
             />
 
-            {/* Buy Securely (Escrow) - only show for non-owners */}
-            {!isOwner && (
+            {/* Buy Securely (Escrow) - only show for logged-in non-owners */}
+            {!isOwner && currentUserId && (
               <EscrowActions
                 listingId={listing.id}
                 sellerId={listing.user_id}

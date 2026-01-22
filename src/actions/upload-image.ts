@@ -19,7 +19,7 @@ export async function uploadListingImage(
   // ✅ Validate input
   const validationResult = imageUploadSchema.safeParse({ userId })
   if (!validationResult.success) {
-    return { data: null, error: validationResult.error.errors[0].message }
+    return { data: null, error: validationResult.error.issues[0].message }
   }
 
   // ✅ Verify user is authenticated and matches userId

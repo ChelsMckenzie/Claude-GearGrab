@@ -4,7 +4,6 @@ import type {
   ListingInsert,
   ListingUpdate,
   ListingFilters,
-  Database,
 } from '@/types/database'
 
 /**
@@ -29,7 +28,8 @@ export interface ListingsService {
 }
 
 export function createListingsService(
-  supabase: SupabaseClient<Database>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>
 ): ListingsService {
   return {
     async createListing(data: ListingInsert): Promise<ListingsServiceResult<Listing>> {

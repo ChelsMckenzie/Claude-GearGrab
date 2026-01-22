@@ -265,37 +265,56 @@ export interface Database {
         Row: Profile
         Insert: ProfileInsert
         Update: ProfileUpdate
+        Relationships: []
       }
       listings: {
         Row: Listing
         Insert: ListingInsert
         Update: ListingUpdate
+        Relationships: []
       }
       contact_requests: {
         Row: ContactRequest
         Insert: ContactRequestInsert
         Update: ContactRequestUpdate
+        Relationships: []
       }
       conversations: {
         Row: Conversation
         Insert: ConversationInsert
         Update: never
+        Relationships: []
       }
       messages: {
         Row: Message
         Insert: MessageInsert
         Update: never
+        Relationships: []
       }
       reviews: {
         Row: Review
         Insert: ReviewInsert
         Update: never
+        Relationships: []
       }
       transactions: {
         Row: Transaction
         Insert: TransactionInsert
         Update: TransactionUpdate
+        Relationships: []
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

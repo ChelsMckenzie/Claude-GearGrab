@@ -25,7 +25,7 @@ export async function createTransaction(
   })
 
   if (!validationResult.success) {
-    return { data: null, error: validationResult.error.errors[0].message }
+    return { data: null, error: validationResult.error.issues[0].message }
   }
 
   // ✅ Verify buyer is authenticated and matches buyerId
@@ -98,7 +98,7 @@ export async function updateTransactionStatus(
   })
 
   if (!validationResult.success) {
-    return { data: null, error: validationResult.error.errors[0].message }
+    return { data: null, error: validationResult.error.issues[0].message }
   }
 
   const { user } = await requireAuth()
