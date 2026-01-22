@@ -1,33 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-
-function isValidSupabaseUrl(url: string | undefined): boolean {
-  if (!url) return false
-  try {
-    const parsed = new URL(url)
-    // Must be HTTPS and contain supabase in the hostname
-    return parsed.protocol === 'https:' && parsed.hostname.includes('supabase')
-  } catch {
-    return false
-  }
-}
+import { env } from '@/lib/env'
 
 export async function updateSession(request: NextRequest) {
   const supabaseResponse = NextResponse.next({
     request,
   })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  // Skip Supabase auth check if credentials are not properly configured
-  // This ensures builds don't hang when env vars are missing or invalid
-  if (!isValidSupabaseUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey.startsWith('sb_')) {
-    return supabaseResponse
-  }
-
   try {
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -41,8 +22,9 @@ export async function updateSession(request: NextRequest) {
     })
 
     await supabase.auth.getUser()
-  } catch {
-    // Silently fail - auth check is optional during development/build
+  } catch (error) {
+    // Log error but don't block request - middleware should not throw
+    console.error('Middleware auth check failed:', error)
   }
 
   return supabaseResponse

@@ -4,10 +4,17 @@ import { ListingsTab } from './listings-tab'
 import { InquiriesTab } from './inquiries-tab'
 import { SettingsTab } from './settings-tab'
 import { Package, MessageSquare, Settings } from 'lucide-react'
+import { getCurrentUser } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
 export default async function DashboardPage() {
-  // Mock current user - in production this would come from auth
-  const currentUserId = 'user-seller-1'
+  const user = await getCurrentUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const currentUserId = user.id
 
   const [listingsResult, requestsResult] = await Promise.all([
     getUserListings(currentUserId),

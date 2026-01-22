@@ -6,6 +6,7 @@ import { ContactActions } from './contact-actions'
 import { EscrowActions } from './escrow-actions'
 import { cn } from '@/lib/utils'
 import { CheckCircle, User } from 'lucide-react'
+import { getCurrentUser } from '@/lib/auth'
 
 interface ListingDetailPageProps {
   params: Promise<{ id: string }>
@@ -14,8 +15,8 @@ interface ListingDetailPageProps {
 export default async function ListingDetailPage({ params }: ListingDetailPageProps) {
   const { id } = await params
 
-  // Mock current user - in production this would come from auth
-  const currentUserId = 'user-buyer-1'
+  const user = await getCurrentUser()
+  const currentUserId = user?.id
 
   const { data, error } = await getListingDetails(id, currentUserId)
 

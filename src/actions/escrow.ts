@@ -1,11 +1,9 @@
 'use server'
 
 import type { Transaction, TransactionStatus } from '@/types/database'
-
-// Mock transaction store
-const mockTransactions: Map<string, Transaction> = new Map()
-
-let transactionCounter = 0
+import { requireAuth } from '@/lib/auth'
+import { createClient } from '@/utils/supabase/server'
+import { createTransactionSchema, updateTransactionStatusSchema } from '@/lib/validations'
 
 export interface CreateTransactionResult {
   data: Transaction | null
@@ -18,26 +16,43 @@ export async function createTransaction(
   listingId: string,
   amount: number
 ): Promise<CreateTransactionResult> {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  transactionCounter++
-  const transactionId = `txn-${transactionCounter}`
-
-  const transaction: Transaction = {
-    id: transactionId,
-    buyer_id: buyerId,
-    seller_id: sellerId,
-    listing_id: listingId,
+  // ✅ Validate input
+  const validationResult = createTransactionSchema.safeParse({
+    buyerId,
+    sellerId,
+    listingId,
     amount,
-    status: 'funds_secured', // Immediately mark as funds secured for mock
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  })
+
+  if (!validationResult.success) {
+    return { data: null, error: validationResult.error.errors[0].message }
   }
 
-  mockTransactions.set(transactionId, transaction)
+  // ✅ Verify buyer is authenticated and matches buyerId
+  const { user } = await requireAuth()
+  if (user.id !== buyerId) {
+    return { data: null, error: 'Unauthorized' }
+  }
 
-  return { data: transaction, error: null }
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert({
+      buyer_id: buyerId,
+      seller_id: sellerId,
+      listing_id: listingId,
+      amount,
+      status: 'escrow_pending',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return { data: null, error: error.message }
+  }
+
+  return { data, error: null }
 }
 
 export interface GetTransactionResult {
@@ -46,27 +61,22 @@ export interface GetTransactionResult {
 }
 
 export async function getTransaction(transactionId: string): Promise<GetTransactionResult> {
-  await new Promise((resolve) => setTimeout(resolve, 100))
+  const { user } = await requireAuth()
+  const supabase = await createClient()
 
-  const transaction = mockTransactions.get(transactionId)
+  const { data: transaction, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', transactionId)
+    .single()
 
-  if (!transaction) {
-    // Return a mock transaction for testing
-    if (transactionId.startsWith('txn-')) {
-      const mockTransaction: Transaction = {
-        id: transactionId,
-        buyer_id: 'user-buyer-1',
-        seller_id: 'user-seller-1',
-        listing_id: 'listing-1',
-        amount: 1200,
-        status: 'funds_secured',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      mockTransactions.set(transactionId, mockTransaction)
-      return { data: mockTransaction, error: null }
-    }
+  if (error || !transaction) {
     return { data: null, error: 'Transaction not found' }
+  }
+
+  // ✅ Verify user is buyer or seller
+  if (transaction.buyer_id !== user.id && transaction.seller_id !== user.id) {
+    return { data: null, error: 'Unauthorized' }
   }
 
   return { data: transaction, error: null }
@@ -81,19 +91,48 @@ export async function updateTransactionStatus(
   transactionId: string,
   status: TransactionStatus
 ): Promise<UpdateTransactionResult> {
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  // ✅ Validate input
+  const validationResult = updateTransactionStatusSchema.safeParse({
+    transactionId,
+    status,
+  })
 
-  const transaction = mockTransactions.get(transactionId)
+  if (!validationResult.success) {
+    return { data: null, error: validationResult.error.errors[0].message }
+  }
+
+  const { user } = await requireAuth()
+  const supabase = await createClient()
+
+  // Get transaction first to verify ownership
+  const { data: transaction } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', transactionId)
+    .single()
 
   if (!transaction) {
     return { data: null, error: 'Transaction not found' }
   }
 
-  transaction.status = status
-  transaction.updated_at = new Date().toISOString()
-  mockTransactions.set(transactionId, transaction)
+  // ✅ Verify user is buyer or seller
+  if (transaction.buyer_id !== user.id && transaction.seller_id !== user.id) {
+    return { data: null, error: 'Unauthorized' }
+  }
 
-  return { data: transaction, error: null }
+  // Update transaction
+  const { data: updatedTransaction, error } = await supabase
+    .from('transactions')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', transactionId)
+    .select()
+    .single()
+
+  if (error) {
+    return { data: null, error: error.message }
+  }
+
+  return { data: updatedTransaction, error: null }
 }
 
 export async function confirmShipping(transactionId: string): Promise<UpdateTransactionResult> {

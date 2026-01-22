@@ -7,6 +7,14 @@ import type {
   Database,
 } from '@/types/database'
 
+/**
+ * Escape special characters in LIKE patterns to prevent SQL injection
+ * % and _ are special characters in SQL LIKE patterns
+ */
+function escapeLikePattern(input: string): string {
+  return input.replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
 export interface ListingsServiceResult<T> {
   data: T | null
   error: Error | null
@@ -64,8 +72,10 @@ export function createListingsService(
           query = query.eq('user_id', filters.userId)
         }
         if (filters.search) {
+          // ✅ Escape special characters to prevent SQL injection
+          const escapedSearch = escapeLikePattern(filters.search)
           query = query.or(
-            `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,brand.ilike.%${filters.search}%`
+            `title.ilike.%${escapedSearch}%,description.ilike.%${escapedSearch}%,brand.ilike.%${escapedSearch}%`
           )
         }
       }

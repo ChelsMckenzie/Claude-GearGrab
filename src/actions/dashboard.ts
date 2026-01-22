@@ -1,91 +1,8 @@
 'use server'
 
 import type { Listing, ContactRequest, ContactRequestStatus, Profile } from '@/types/database'
-
-// Re-use mock data references from other actions
-// In production, these would all query Supabase
-
-// Mock listings data (same as listings.ts)
-const mockListings: Listing[] = [
-  {
-    id: 'listing-1',
-    user_id: 'user-seller-1',
-    title: 'Trail Running Shoes',
-    description: 'Lightweight trail runners perfect for mountain terrain.',
-    price: 1200,
-    images: ['/images/hiking-shoes.jpg'],
-    category: 'Hiking',
-    sub_category: 'Footwear',
-    brand: 'Salomon',
-    model: 'Speedcross 5',
-    condition: 'Slightly used',
-    retail_price: 2400,
-    discount_percent: 50,
-    product_link: 'https://salomon.com/speedcross5',
-    estimated_retail_price: 2400,
-    status: 'active',
-    created_at: '2024-01-15T10:00:00Z',
-    updated_at: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: 'listing-3',
-    user_id: 'user-seller-1',
-    title: 'Hiking Backpack 65L',
-    description: 'Large capacity backpack for multi-day hikes.',
-    price: 800,
-    images: ['/images/backpack.jpg'],
-    category: 'Hiking',
-    sub_category: 'Backpacks',
-    brand: 'Osprey',
-    model: 'Atmos AG 65',
-    condition: 'New',
-    retail_price: 1600,
-    discount_percent: 50,
-    product_link: 'https://osprey.com/atmos',
-    estimated_retail_price: 1600,
-    status: 'active',
-    created_at: '2024-01-13T10:00:00Z',
-    updated_at: '2024-01-13T10:00:00Z',
-  },
-]
-
-// Mock profiles for buyer info
-const mockProfiles: Record<string, Profile> = {
-  'user-buyer-1': {
-    id: 'user-buyer-1',
-    display_name: 'John Buyer',
-    phone: '+27 82 111 2222',
-    avatar_url: null,
-    is_verified: false,
-    allow_whatsapp: true,
-    created_at: '2024-01-01T10:00:00Z',
-    updated_at: '2024-01-01T10:00:00Z',
-  },
-  'user-buyer-2': {
-    id: 'user-buyer-2',
-    display_name: 'Jane Interested',
-    phone: '+27 82 333 4444',
-    avatar_url: null,
-    is_verified: true,
-    allow_whatsapp: true,
-    created_at: '2024-01-01T10:00:00Z',
-    updated_at: '2024-01-01T10:00:00Z',
-  },
-}
-
-// Mock contact requests with pre-populated data for testing
-const mockContactRequests: ContactRequest[] = [
-  {
-    id: 'request-1',
-    buyer_id: 'user-buyer-1',
-    seller_id: 'user-seller-1',
-    listing_id: 'listing-1',
-    status: 'pending',
-    message: 'Hi, I am very interested in these shoes! Are they still available?',
-    created_at: '2024-01-16T10:00:00Z',
-    updated_at: '2024-01-16T10:00:00Z',
-  },
-]
+import { requireAuthWithId, requireAuth } from '@/lib/auth'
+import { createClient } from '@/utils/supabase/server'
 
 // ===========================================
 // Dashboard Server Actions
@@ -97,11 +14,21 @@ export interface GetUserListingsResult {
 }
 
 export async function getUserListings(userId: string): Promise<GetUserListingsResult> {
-  await new Promise((resolve) => setTimeout(resolve, 100))
+  // ✅ Verify user is authenticated and matches userId
+  await requireAuthWithId(userId)
 
-  const userListings = mockListings.filter((l) => l.user_id === userId)
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('listings')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
 
-  return { data: userListings, error: null }
+  if (error) {
+    return { data: null, error: error.message }
+  }
+
+  return { data: data || [], error: null }
 }
 
 export interface IncomingRequest {
@@ -121,27 +48,37 @@ export interface GetIncomingRequestsResult {
 }
 
 export async function getIncomingRequests(sellerId: string): Promise<GetIncomingRequestsResult> {
-  await new Promise((resolve) => setTimeout(resolve, 100))
+  // ✅ Verify user is authenticated and matches sellerId
+  await requireAuthWithId(sellerId)
 
-  // Get all requests for this seller
-  const requests = mockContactRequests.filter((r) => r.seller_id === sellerId)
+  const supabase = await createClient()
 
-  // Enrich with buyer profile and listing data
-  const enrichedRequests: IncomingRequest[] = requests.map((request) => {
-    const buyer = mockProfiles[request.buyer_id]
-    const listing = mockListings.find((l) => l.id === request.listing_id)
+  // Get contact requests with buyer and listing info
+  const { data: requests, error: requestsError } = await supabase
+    .from('contact_requests')
+    .select(`
+      *,
+      buyer:profiles!contact_requests_buyer_id_fkey(display_name, is_verified),
+      listing:listings!contact_requests_listing_id_fkey(title)
+    `)
+    .eq('seller_id', sellerId)
+    .order('created_at', { ascending: false })
 
-    return {
-      id: request.id,
-      buyerName: buyer?.display_name || 'Unknown Buyer',
-      buyerVerified: buyer?.is_verified || false,
-      message: request.message,
-      listingTitle: listing?.title || 'Unknown Listing',
-      listingId: request.listing_id,
-      status: request.status,
-      createdAt: request.created_at,
-    }
-  })
+  if (requestsError) {
+    return { data: null, error: requestsError.message }
+  }
+
+  // Transform to IncomingRequest format
+  const enrichedRequests: IncomingRequest[] = (requests || []).map((request: any) => ({
+    id: request.id,
+    buyerName: request.buyer?.display_name || 'Unknown Buyer',
+    buyerVerified: request.buyer?.is_verified || false,
+    message: request.message,
+    listingTitle: request.listing?.title || 'Unknown Listing',
+    listingId: request.listing_id,
+    status: request.status,
+    createdAt: request.created_at,
+  }))
 
   return { data: enrichedRequests, error: null }
 }
@@ -155,18 +92,37 @@ export async function updateRequestStatus(
   requestId: string,
   status: ContactRequestStatus
 ): Promise<UpdateRequestStatusResult> {
-  await new Promise((resolve) => setTimeout(resolve, 300))
+  const { user } = await requireAuth()
+  const supabase = await createClient()
 
-  const request = mockContactRequests.find((r) => r.id === requestId)
+  // ✅ Verify user is the seller of this request
+  const { data: request } = await supabase
+    .from('contact_requests')
+    .select('seller_id')
+    .eq('id', requestId)
+    .single()
 
   if (!request) {
     return { data: null, error: 'Request not found' }
   }
 
-  request.status = status
-  request.updated_at = new Date().toISOString()
+  if (request.seller_id !== user.id) {
+    return { data: null, error: 'Unauthorized' }
+  }
 
-  return { data: { id: request.id, status: request.status }, error: null }
+  // Update request status
+  const { data: updatedRequest, error } = await supabase
+    .from('contact_requests')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', requestId)
+    .select()
+    .single()
+
+  if (error) {
+    return { data: null, error: error.message }
+  }
+
+  return { data: { id: updatedRequest.id, status: updatedRequest.status }, error: null }
 }
 
 export interface DeleteListingResult {
@@ -175,16 +131,33 @@ export interface DeleteListingResult {
 }
 
 export async function deleteListing(listingId: string): Promise<DeleteListingResult> {
-  await new Promise((resolve) => setTimeout(resolve, 200))
+  const { user } = await requireAuth()
+  const supabase = await createClient()
 
-  const index = mockListings.findIndex((l) => l.id === listingId)
+  // ✅ Verify user owns the listing
+  const { data: listing } = await supabase
+    .from('listings')
+    .select('user_id')
+    .eq('id', listingId)
+    .single()
 
-  if (index === -1) {
+  if (!listing) {
     return { data: null, error: 'Listing not found' }
   }
 
-  // Mark as hidden instead of actually deleting (soft delete)
-  mockListings[index].status = 'hidden'
+  if (listing.user_id !== user.id) {
+    return { data: null, error: 'Unauthorized' }
+  }
+
+  // Soft delete - mark as hidden
+  const { error } = await supabase
+    .from('listings')
+    .update({ status: 'hidden', updated_at: new Date().toISOString() })
+    .eq('id', listingId)
+
+  if (error) {
+    return { data: null, error: error.message }
+  }
 
   return { data: { id: listingId }, error: null }
 }

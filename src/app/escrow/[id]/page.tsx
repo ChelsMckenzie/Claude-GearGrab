@@ -1,10 +1,11 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getTransaction } from '@/actions/escrow'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { TrustTimeline } from './trust-timeline'
 import { EscrowActionButtons } from './escrow-action-buttons'
 import { ShieldCheck } from 'lucide-react'
+import { getCurrentUser } from '@/lib/auth'
 
 interface EscrowPageProps {
   params: Promise<{ id: string }>
@@ -13,8 +14,13 @@ interface EscrowPageProps {
 export default async function EscrowPage({ params }: EscrowPageProps) {
   const { id } = await params
 
-  // Mock current user - in production this would come from auth
-  const currentUserId = 'user-buyer-1'
+  const user = await getCurrentUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const currentUserId = user.id
 
   const { data: transaction, error } = await getTransaction(id)
 

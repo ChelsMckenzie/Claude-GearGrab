@@ -1,6 +1,8 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { requireAuth } from '@/lib/auth'
+import { imageUploadSchema } from '@/lib/validations'
 
 export interface UploadImageResult {
   data: {
@@ -14,6 +16,18 @@ export async function uploadListingImage(
   formData: FormData,
   userId: string
 ): Promise<UploadImageResult> {
+  // ✅ Validate input
+  const validationResult = imageUploadSchema.safeParse({ userId })
+  if (!validationResult.success) {
+    return { data: null, error: validationResult.error.errors[0].message }
+  }
+
+  // ✅ Verify user is authenticated and matches userId
+  const { user } = await requireAuth()
+  if (user.id !== userId) {
+    return { data: null, error: 'Unauthorized' }
+  }
+
   const file = formData.get('file') as File | null
 
   if (!file) {
@@ -37,17 +51,6 @@ export async function uploadListingImage(
   const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
 
   const supabase = await createClient()
-
-  // Check if Supabase is properly configured
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (!supabaseUrl || !supabaseUrl.includes('supabase')) {
-    // Mock upload for development without Supabase
-    const mockUrl = `/mock-images/${fileName}`
-    return {
-      data: { url: mockUrl, path: fileName },
-      error: null,
-    }
-  }
 
   // Upload to Supabase Storage
   const { data, error } = await supabase.storage
@@ -77,12 +80,6 @@ export async function uploadListingImage(
 }
 
 export async function deleteListingImage(path: string): Promise<{ error: string | null }> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (!supabaseUrl || !supabaseUrl.includes('supabase')) {
-    // Mock delete for development
-    return { error: null }
-  }
-
   const supabase = await createClient()
 
   const { error } = await supabase.storage.from('listing-images').remove([path])

@@ -2,24 +2,30 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { UserNav } from './user-nav'
 import { Mountain, Search } from 'lucide-react'
+import { getCurrentUser as getAuthUser } from '@/lib/auth'
+import { createClient } from '@/utils/supabase/server'
 
-// Mock function to get current user session
-// In production, this would use Supabase auth
 async function getCurrentUser() {
-  // Check for mock user cookie/session
-  // For now, we'll use an environment variable or default to mock user
-  const mockLoggedIn = process.env.MOCK_USER_LOGGED_IN === 'true'
+  const user = await getAuthUser()
 
-  if (mockLoggedIn) {
-    return {
-      id: 'user-seller-1',
-      email: 'seller@example.com',
-      displayName: 'Sarah Seller',
-      isVerified: true,
-    }
+  if (!user) {
+    return null
   }
 
-  return null
+  // Get profile for display name and verification status
+  const supabase = await createClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name, is_verified')
+    .eq('id', user.id)
+    .single()
+
+  return {
+    id: user.id,
+    email: user.email || '',
+    displayName: profile?.display_name || 'User',
+    isVerified: profile?.is_verified || false,
+  }
 }
 
 export async function Navbar() {

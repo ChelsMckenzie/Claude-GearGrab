@@ -21,11 +21,11 @@ const mockResult: GearAnalysisResult = {
   confidence: 95,
 }
 
-export async function analyzeGear(imageData: string): Promise<AnalyzeGearResult> {
-  const apiKey = process.env.GEMINI_API_KEY
+import { env } from '@/lib/env'
 
-  // If no API key or using placeholder, use mock response (for development/testing)
-  if (!apiKey || apiKey.length < 20) {
+export async function analyzeGear(imageData: string): Promise<AnalyzeGearResult> {
+  // If no API key, use mock response (for development/testing)
+  if (!env.geminiApiKey || env.geminiApiKey.length < 20) {
     // Simulate AI processing delay
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
@@ -38,7 +38,7 @@ export async function analyzeGear(imageData: string): Promise<AnalyzeGearResult>
 
   // Real Gemini API integration
   try {
-    const genAI = new GoogleGenerativeAI(apiKey)
+    const genAI = new GoogleGenerativeAI(env.geminiApiKey!)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
     // Extract base64 data from data URL
